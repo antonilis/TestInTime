@@ -1,8 +1,11 @@
+import os
+
 import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def read_spectrum(filepath):
+# TODO There should be only 1 reading function
+def read_txt_spectrum(filepath):
     """
     Reads numeric data from file and returns DataFrame
     :param filepath: String
@@ -25,35 +28,54 @@ def read_spectrum(filepath):
         return None
 
     data_df.set_index('Raman Shift', inplace=True)
-    return data_df
+
+    data = data_df.T
+    # changes col names type from int to str, for .loc
+    cols = [str(x) for x in data.columns]
+    data.columns = cols
+
+    return data
 
 
-path = './test_w_czasie/2023_12_22/SP_5.csv'
+def read_csv_spectrum(file_path):
+    parameters = {'sep': ',', 'header': None, 'engine': 'python', 'skiprows': 242, 'skipfooter': 2129 - 1500}
 
-file_sections = {'up': {'parameters': {'skiprows': 80, 'skipfooter': 2129 - 243}, 'axis': [1, 5]},
-               'bottom': {'parameters': {'skiprows': 242, 'skipfooter': 2129 - 2064}, 'axis': [5, 9]},
-               'down': {'parameters': {'skiprows': 2063, 'skipfooter': 0}, 'axis': [1, 5]}
-                 }
+    data = pd.read_csv(file_path, **parameters).iloc[:, [5, 11]]
 
-df_list = []
+    data.columns = 'Raman Shift', 'Dark Subtracted #1'
 
-for section in file_sections:
+    data = data[data.iloc[:, 0] > 253]
 
-    df = pd.read_csv(path, sep=',', header=None, engine='python', **file_sections[section]['parameters'])
+    data = data.astype({'Raman Shift': 'int'})
 
-    df = df.iloc[:, [-7, -8]]
+    # Solution for files in which there were no values in the column "Raman Shift"
+    if data.empty:
+        return None
 
-    df.columns = 'raman shift', 'intensity'
-    df.set_index('raman shift', inplace=True)
+    data.set_index('Raman Shift', inplace=True)
 
-    df_list.append(df)
+    data = data.T
+    # changes col names type from int to str, for .loc
+    cols = [str(x) for x in data.columns]
+    data.columns = cols
 
-dat = pd.concat(df_list)
-
-old_df = read_spectrum('../data/2023-08-21/PMBA/A/SP_4.txt')
+    return data
 
 
-plt.plot(dat)
-plt.show()
+def read_files(path, date, file_name):
+    direction = os.path.join(path, date, file_name)
 
-plt.plot(old_df)
+    extension = os.path.splitext(direction)[1]
+
+    if extension == '.csv':
+
+        df = read_csv_spectrum(direction)
+
+    elif extension == '.txt':
+
+        df = read_txt_spectrum(direction)
+
+    else:
+        raise ValueError('Wrong extension of the file')
+
+    return df
